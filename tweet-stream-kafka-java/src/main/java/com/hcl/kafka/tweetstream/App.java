@@ -34,7 +34,8 @@ public class App {
 	final static String accessSecret = "4HkAHQdSUUmsc6sj9HHKHt2XqB4mJpk6bPhGKNumTntLc"; //Access Token secret
 	
 	final static String keywords = "seahawks";
-	final static String topicName = "seahawksTopic";
+	//final static String topicName = "seahawksTopic";
+    final static String topicName = "seahawksKafkaTopic";
 	
     public static void main( String[] args ) throws InterruptedException {
         System.out.println( "Hello World!" );
@@ -114,22 +115,30 @@ public class App {
         props.put("batch.size", 16384);
         props.put("linger.ms", 1);
         props.put("buffer.memory", 33554432);
-        
-        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG,  "org.apache.kafka.common.serialization.StringSerializer");
-        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG,  "org.apache.kafka.common.serialization.StringSerializer");
+
+        /*
+        We insert two properties for serialization. One for the key and one for the value. Down below at the 'producer.send()' method, we send a ProducerRecord (essentially a map)
+        with a String as the key, and a Status as the value. In order to serialize them both, we need to insert our StringSerializer for the key and our
+        StatusSerializer for the value.
+         */
+        Thread.currentThread().setContextClassLoader(null);
+        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG,  "org.apache.kafka.common.serialization.StringSerializer"); // This is the key for our ProducerRecord
+        //props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG,  "org.apache.kafka.common.serialization.StringSerializer"); // This is the value for our ProducerRecord
+        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG,  StatusSerializer.class.getName());
         System.out.println("It breaks at producer!");
-        Producer<String, String> producer = new KafkaProducer<String, String>(props);
+        //Producer<String, String> producer = new KafkaProducer<String, String>(props);
+        Producer<String, Status> producer = new KafkaProducer<>(props);
         System.out.println("It breaks when creating future");
-        Future<RecordMetadata> future = producer.send(new ProducerRecord<String, String>(topicName, "5", "This finally works!	"));
+        //Future<RecordMetadata> future = producer.send(new ProducerRecord<String, Status>(topicName, "5", "This finally works!"));
         
         System.out.println("Checking the connection now...");
-        if(future.isCancelled()) {
+        /*if(future.isCancelled()) {
         	System.out.println("Something got dropped!");
-        }
+        }*/
         
         Thread.sleep(5000);
         	
-        System.out.println(future.isDone());
+        //System.out.println(future.isDone());
         
         
         int i = 0;
@@ -139,22 +148,22 @@ public class App {
         
         while(i < 100) {
         	Status ret =  queue.poll();
-        	
+
         	if (ret == null) {
             	System.out.println("Waiting for response..");
         		Thread.sleep(5000);
         		i++;
         	}else {
-                System.out.println(ret.getText());
-                producer.send(new ProducerRecord<String, String>(
-                        topicName, Integer.toString(j++), ret.getText()
-                ));
+                System.out.println(ret.getCreatedAt());
+                //ret.get
+                producer.send(new ProducerRecord<String, Status>(topicName, Integer.toString(j++), ret));
         		/*for(HashtagEntity hashtage : ret.getHashtagEntities()) {
                 	System.out.println(ret.getHashtagEntities().length);
         			System.out.println("Hashtag: "+ hashtage.getText());
         			producer.send(new ProducerRecord<String, String>(
         				topicName, Integer.toString(j++), hashtage.getText()));
         		}*/
+
         	}
         }
              
